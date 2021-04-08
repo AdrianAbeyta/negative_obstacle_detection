@@ -441,3 +441,4 @@ sensor_msgs::LaserScan FarthestPoint::CombineAllScans( sensor_msgs::LaserScan  a
 
     //     }          
     // }
+
