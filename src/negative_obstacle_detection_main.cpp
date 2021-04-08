@@ -34,7 +34,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr negative_cloud_filter ( new pcl::PointCloud<
 pcl::PointCloud<pcl::PointXYZ>::Ptr floor_cloud_filter ( new pcl::PointCloud<pcl::PointXYZ> );
 pcl::PointCloud<pcl::PointXYZ>::Ptr Points_To_Floor_filter ( new pcl::PointCloud<pcl::PointXYZ> );
 pcl::PointCloud<pcl::PointXYZ>::Ptr camera_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
-
+pcl::PointCloud<pcl::PointXYZ>::Ptr lidar_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
 
 void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& camera_cloud, const sensor_msgs::PointCloud2ConstPtr& lidar_cloud){
     
@@ -50,11 +50,17 @@ void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& camera_cloud, co
     pcl::PointCloud<pcl::PointXYZ>::Ptr temp_lidar_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromPCLPointCloud2(pcl_pc2_2,*temp_lidar_cloud);
 
-    // Create the filtering object
-    pcl::VoxelGrid<pcl::PointXYZ> sor;
-    sor.setInputCloud (temp_camera_cloud);
-    sor.setLeafSize (0.03f, 0.03f, 0.03f);
-    sor.filter (*camera_cloud_filtered);
+    // Create the filtering object for camera 
+    pcl::VoxelGrid<pcl::PointXYZ> sor_camera;
+    sor_camera.setInputCloud (temp_camera_cloud);
+    sor_camera.setLeafSize (0.03f, 0.03f, 0.03f);
+    sor_camera.filter (*camera_cloud_filtered);
+
+    // Create the filtering object for lidar 
+    pcl::VoxelGrid<pcl::PointXYZ> sor_lidar;
+    sor_lidar.setInputCloud (temp_lidar_cloud);
+    sor_lidar.setLeafSize (0.3f, 0.3f, 0.3f);
+    sor_lidar.filter (*lidar_cloud_filtered);
 
     floor_cloud_filter = point_cloud_->FloorProjection( camera_cloud_filtered, floor_cloud_filter );
     negative_cloud_filter = point_cloud_->NegativeLimitFilter( camera_cloud_filtered , negative_cloud_filter );
@@ -62,11 +68,13 @@ void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& camera_cloud, co
     A_ = furthest_point_->FurthestPointExtraction( floor_cloud_filter );
     B_ = furthest_point_->VirtualFloorProjection( negative_cloud_filter );
     C_ = furthest_point_->CombineLaserScans( A_ , B_ , C_) ;
+    cout<<C_.header.frame_id<<endl;
 
-    Points_To_Floor_filter = point_cloud_->PointsToFloor(temp_lidar_cloud, Points_To_Floor_filter );
+
+    Points_To_Floor_filter = point_cloud_->PointsToFloor(lidar_cloud_filtered, Points_To_Floor_filter );
     D_ = furthest_point_->PointToLaser(Points_To_Floor_filter);
-
-    E_ = furthest_point_->CombineLaserScans( C_ , D_ , E_) ;
+    cout<<D_.header.frame_id<<endl;
+    //E_ = furthest_point_->CombineLaserScans( C_ , D_ , E_) ;
 
 }
 
@@ -87,20 +95,21 @@ int main(int argc, char** argv) {
     S.reset(new Sync( MySyncPolicy(10), camera_cloud_sub, lidar_cloud_sub));
     S->registerCallback( boost::bind(&pointcloudCallback, _1, _2) );
 
-    ros::Publisher laser_pub = nh.advertise<sensor_msgs::LaserScan>("/scan", 500);
+    ros::Publisher camera_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/camera_scan", 500);
+    ros::Publisher velodyne_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/velodyne_scan", 500);
     ros::Publisher filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/vertical_points_filter", 100000);
 
 
-    ros::Rate loop_rate(10);
+    ros::Rate loop_rate(20);
     
     int count = 0;
     while (ros::ok())
     {   
         
-        filter_pub.publish(*floor_cloud_filter);
+        filter_pub.publish(*Points_To_Floor_filter);
+        camera_laser_pub.publish(C_);
+        velodyne_laser_pub.publish(D_);
         
-        laser_pub.publish(E_);
-
         ros::spinOnce();
         loop_rate.sleep();
         ++count;
