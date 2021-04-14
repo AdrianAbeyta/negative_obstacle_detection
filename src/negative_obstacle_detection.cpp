@@ -46,11 +46,11 @@ namespace NegativeObstacle{
 //// Lidar /////
 pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::PointsToFloor( const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered ){
 
-// Create the filtering object
+    // Create the filtering object
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud (cloud);
-    pass.setFilterFieldName ("z");
-    pass.setFilterLimits (-0.15, 0.35); // (-5, -0.5) //-0.15, 0.4
+    pass.setFilterFieldName ("z"); //z-lidar
+    pass.setFilterLimits (-0.15, 0.35);   // camera (-0.35, 0.3) (-5, -0.5)-Lidar sim //-0.15, 0.35-LIDAR
     
     //Fill in the new filter
     pass.filter (*cloud_filtered);
@@ -76,8 +76,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::FloorProjection( const pcl::Point
     // pass.setFilterLimits (-10, -0.5); //(-0.7,-0.49)
     
             // Camera //
-    pass.setFilterFieldName ("y");
-    pass.setFilterLimits (0.30, 0.40); //0.24, 0.29
+    // pass.setFilterFieldName ("y");
+    // pass.setFilterLimits (0.30, 0.40); //0.24, 0.29
     
     // //Fill in the new filter
     pass.filter (*cloud_filtered);
@@ -97,7 +97,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::NegativeLimitFilter( const pcl::P
     
             // Camera //
     pass.setFilterFieldName ("y");
-    pass.setFilterLimits (0.35, 10); // (-5, -0.5) // (higher # = down from bottowm, higher number = up from top? )
+    pass.setFilterLimits (0.5, 10); // (-5, -0.5) // (higher # = down from bottowm, higher number = up from top? ) // 0.5, 10
    
     //Fill in the new filter
     pass.filter (*cloud_filtered);
@@ -223,7 +223,8 @@ sensor_msgs::LaserScan FarthestPoint::PointToLaser( pcl::PointCloud<pcl::PointXY
     
     if (scan.header.frame_id.empty())
     {
-      scan.header.frame_id = cloud_filtered->header.frame_id;
+      scan.header.frame_id = "camera_color_frame";
+      //scan.header.frame_id = cloud_filtered->header.frame_id;
       scan.header.seq = cloud_filtered->header.seq;
     }
 
@@ -246,11 +247,16 @@ sensor_msgs::LaserScan FarthestPoint::PointToLaser( pcl::PointCloud<pcl::PointXY
         double point_x = cloud_filtered->points[i].x;
         double point_z = cloud_filtered->points[i].z;
         
-           
-        // Convert from cartesian point to polar coordnates. 
+        ///////////  LIDAR ////////////
+        //Convert from cartesian point to polar coordnates. 
         double range = sqrt(point_x*point_x + point_y*point_y);
         double angle = atan2(point_y, point_x);
         int index = (angle - scan.angle_min) / scan.angle_increment; 
+        
+        // // Convert from cartesian point to polar coordnates. 
+        // double range = hypot(point_z, point_x);
+        // double angle = atan2(point_x,point_z);
+        // int index = (angle - scan.angle_min) / scan.angle_increment;
 
         if (range < scan.ranges[index])
         {
@@ -441,4 +447,3 @@ sensor_msgs::LaserScan FarthestPoint::CombineAllScans( sensor_msgs::LaserScan  a
 
     //     }          
     // }
-
