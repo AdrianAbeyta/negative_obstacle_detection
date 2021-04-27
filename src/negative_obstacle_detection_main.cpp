@@ -75,7 +75,7 @@ void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& camera_cloud, co
     D_ = furthest_point_->CombineLaserScans( B_ , C_ , D_);
     D_.header.frame_id = "velodyne";
 
-    ROS_INFO("ODOM: [%f]", (*lidar_cloud).header.stamp);
+    //ROS_INFO("ODOM: [%f]", (*lidar_cloud).header.stamp);
 }
 
 int main(int argc, char** argv) {
