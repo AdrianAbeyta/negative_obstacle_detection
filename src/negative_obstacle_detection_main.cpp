@@ -24,52 +24,59 @@ FilterPCL* point_cloud_;
 
 using NegativeObstacle::FarthestPoint;
 FarthestPoint* furthest_point_;
+
+// Final Laserscans 
 sensor_msgs::LaserScan  A_;
 sensor_msgs::LaserScan  B_;
 sensor_msgs::LaserScan  C_;
 sensor_msgs::LaserScan  D_;
 
+// Pointcloud manipulation 
 pcl::PointCloud<pcl::PointXYZ>::Ptr negative_cloud_filter ( new pcl::PointCloud<pcl::PointXYZ> );
 pcl::PointCloud<pcl::PointXYZ>::Ptr floor_cloud_filter ( new pcl::PointCloud<pcl::PointXYZ> );
 pcl::PointCloud<pcl::PointXYZ>::Ptr Points_To_Floor_filter ( new pcl::PointCloud<pcl::PointXYZ> );
+
+// Pointcloud type conversions 
+pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud2_to_pcl (new pcl::PointCloud<pcl::PointXYZ>);
 pcl::PointCloud<pcl::PointXYZ>::Ptr camera_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
-pcl::PointCloud<pcl::PointXYZ>::Ptr lidar_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+//pcl::PointCloud<pcl::PointXYZ>::Ptr lidar_cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
 
 void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& camera_cloud, const sensor_msgs::PointCloud2ConstPtr& lidar_cloud){
     
+    //////////// NEGATIVE OBSTACLE DETECTION ////////////
 
+    // Convert camera sensor_msg to pcl
+    pointcloud2_to_pcl = point_cloud_->PointCloud2_To_PCL(camera_cloud);
+    // Filter the raw camrea points 
+    camera_cloud_filtered = point_cloud_->Filter_Camera_Points(pointcloud2_to_pcl,camera_cloud_filtered);
+    
+    // Filter the camrea points for desired useage (Furthest Point or Virtual Floor)
     //floor_cloud_filter = point_cloud_->FloorProjection( camera_cloud_filtered, floor_cloud_filter );
-    //negative_cloud_filter = point_cloud_->NegativeLimitFilter( camera_cloud_filtered , negative_cloud_filter );
+    negative_cloud_filter = point_cloud_->NegativeLimitFilter( camera_cloud_filtered , negative_cloud_filter );
     
-    
-    //Convert From sensor_msgs::PointCloud2::ConstPtr to a pcl::PointCloud<pcl::pointxyz>::Ptr
-    pcl::PCLPointCloud2 pcl_pc2_2;
-    pcl_conversions::toPCL(*camera_cloud,pcl_pc2_2);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr temp_camera_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromPCLPointCloud2(pcl_pc2_2,*temp_camera_cloud);
-    
-    //Create the filtering object for camera 
-    pcl::VoxelGrid<pcl::PointXYZ> sor_cam;
-    sor_cam.setInputCloud (temp_camera_cloud);
-    sor_cam.setLeafSize (0.06f, 0.06, 0.06f);
-    sor_cam.filter (*camera_cloud_filtered);
-
     //Convert camera points back to sensor msgs pointcloud 2 msg;
     sensor_msgs::PointCloud2  final_camera_points;
-    pcl::toROSMsg(*camera_cloud_filtered,final_camera_points);
+    pcl::toROSMsg( *negative_cloud_filter, final_camera_points);
 
+
+    // Get resulting laserscan msg for each method 
     //A_ = furthest_point_->FurthestPointExtraction( floor_cloud_filter );
     B_ = furthest_point_->VirtualFloorProjection( final_camera_points  );
     
-    /////Points_To_Floor_filter = point_cloud_->PointsToFloor(lidar_cloud, Points_To_Floor_filter );
+    //////////// OBSTACLE DETECTION ////////////
+
+    /////Points_To_Floor_filter = point_cloud_->PointsToFloor(lidar_cloud, Points_To_Floor_filter ); // TO DO -SET UP A WAY TO FILTER DOWN POINTCLOUDS
+    
+    // Get resdulting laserscan from filtered point clouds. 
     C_ = furthest_point_->PointToLaser(lidar_cloud);
     C_.header.frame_id = "velodyne";
 
+    // Combine the respective methods Laserscan into a single scan. 
     D_ = furthest_point_->CombineLaserScans( B_ , C_ , D_);
     D_.header.frame_id = "velodyne";
 
+    ROS_INFO("ODOM: [%f]", (*lidar_cloud).header.stamp);
 }
-
 
 int main(int argc, char** argv) {
     
@@ -87,21 +94,21 @@ int main(int argc, char** argv) {
     S.reset(new Sync( MySyncPolicy(5), camera_cloud_sub, lidar_cloud_sub));
     S->registerCallback( boost::bind(&pointcloudCallback, _1, _2) );
 
-    ros::Publisher camera_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/camera_scan", 10);
-    ros::Publisher velodyne_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/scan_multi", 10);
-    ros::Publisher camera_filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/camera_points_filter", 1000);
+    //ros::Publisher camera_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/camera_scan", 1);
+    ros::Publisher velodyne_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/scan_multi", 1);
+    //ros::Publisher camera_filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/camera_points_filter", 1000);
     ros::Publisher velodyne_filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/velodyne_points_filter", 1000);
 
-    ros::Rate loop_rate(20); //10 Hz
+    ros::Rate loop_rate(10); //10 Hz
     
 
     int count = 0;
     while (ros::ok())
     {   
-        //velodyne_filter_pub.publish(*Points_To_Floor_filter);
+        velodyne_filter_pub.publish(*Points_To_Floor_filter);
         //camera_filter_pub.publish(*negative_cloud_filter);
         
-        camera_laser_pub.publish(C_);
+        //camera_laser_pub.publish(C_);
         velodyne_laser_pub.publish(D_);
 
         ros::spinOnce();
@@ -111,106 +118,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-
-
-/////////////////////////////////////////
-
-    // //Convert From sensor_msgs::PointCloud2::ConstPtr to a pcl::PointCloud<pcl::pointxyz>::Ptr
-    // pcl::PCLPointCloud2 pcl_pc2;
-    // pcl_conversions::toPCL(*camera_cloud,pcl_pc2);
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr temp_camera_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    // pcl::fromPCLPointCloud2(pcl_pc2,*temp_camera_cloud);
-    
-    // //Convert From sensor_msgs::PointCloud2::ConstPtr to a pcl::PointCloud<pcl::pointxyz>::Ptr
-    // pcl::PCLPointCloud2 pcl_pc2_2;
-    // pcl_conversions::toPCL(*lidar_cloud,pcl_pc2_2);
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr temp_lidar_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    // pcl::fromPCLPointCloud2(pcl_pc2_2,*temp_lidar_cloud);
-
-
-
-// //Convert camera points back to sensor msgs pointcloud 2 msg;
-//     sensor_msgs::PointCloud2  camera_c;
-//     pcl::toROSMsg(*negative_cloud_filter,camera_c );
-
-
-// //Create the filtering object for lidar 
-//     pcl::VoxelGrid<pcl::PointXYZ> sor_lidar;
-//     sor_lidar.setInputCloud (temp_lidar_cloud);
-//     sor_lidar.setLeafSize (0.60f, 0.60, 0.12f);
-//     sor_lidar.filter (*lidar_cloud_filtered);
-
-//     //Create the filtering object for camera 
-//     pcl::VoxelGrid<pcl::PointXYZ> sor_camera;
-//     sor_camera.setInputCloud (temp_camera_cloud);
-//     sor_camera.setLeafSize (0.06f, 0.06f, 0.06f);
-//     sor_camera.filter (*camera_cloud_filtered);
-    
-//     //Convert camera points back to sensor msgs pointcloud 2 msg;
-//     sensor_msgs::PointCloud2  camera_c;
-//     pcl::toROSMsg(*camera_cloud_filtered,camera_c );
-    
-//     sensor_msgs::PointCloud2  lidar_c;
-//     //Convert laser points back to sensor msgs pointcloud 2 msg;
-//     sensor_msgs::PointCloud2  camera_c;
-//     pcl::toROSMsg(*lidar_cloud_filtered,lidar_c );
-
-
-
-
-
-// //Convert From sensor_msgs::PointCloud2::ConstPtr to a pcl::PointCloud<pcl::pointxyz>::Ptr
-    // pcl::PCLPointCloud2 pcl_pc2_2;
-    // pcl_conversions::toPCL(*lidar_cloud,pcl_pc2_2);
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr temp_lidar_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    // pcl::fromPCLPointCloud2(pcl_pc2_2,*temp_lidar_cloud);
-
-
-
-
-
-
-// void pointcloudCallback(const pcl::PointCloud<pcl::PointXYZ>::Ptr& camera_cloud, const pcl::PointCloud<pcl::PointXYZ>::Ptr& lidar_cloud){
-    
-//     // Create the filtering object
-//     pcl::VoxelGrid<pcl::PointXYZ> sor;
-//     sor.setInputCloud (camera_cloud);
-//     sor.setLeafSize (0.03f, 0.03f, 0.03f);
-//     sor.filter (*camera_cloud_filtered);
-
-//     floor_cloud_filter = point_cloud_->FloorProjection( camera_cloud_filtered, floor_cloud_filter );
-//     negative_cloud_filter = point_cloud_->NegativeLimitFilter( camera_cloud_filtered , negative_cloud_filter );
-   
-//     A_ = furthest_point_->FurthestPointExtraction( floor_cloud_filter );
-//     B_ = furthest_point_->VirtualFloorProjection( negative_cloud_filter );
-//     //C_ = furthest_point_->CombineLaserScans( A_ , B_ , C_) ;
-
-//     //Points_To_Floor_filter = point_cloud_->PointsToFloor(lidar_cloud,Points_To_Floor_filter );
-//     //D_ = furthest_point_->PointToLaser(Points_To_Floor_filter);
-
-//     //E_ = furthest_point_->CombineAllScans( A_ , B_ , C_, D_, E_) ;
-    
-// }
-
-// void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg){
-//     ROS_INFO("LaserScan (val,angle)=(%f,%f", msg->range_min,msg->angle_min);
-// }
-
-    // message_filters::Subscriber< pcl::PointCloud<pcl::PointXYZ>> camera_cloud_sub(nh,"/camera/depth/color/points", 1);
-    // message_filters::Subscriber< pcl::PointCloud<pcl::PointXYZ>> lidar_cloud_sub(nh,"/velodyne/points", 1);
-   
-    // typedef message_filters::sync_policies::ApproximateTime< pcl::PointCloud<pcl::PointXYZ>, pcl::PointCloud<pcl::PointXYZ>> MySyncPolicy;
-    // typedef message_filters::Synchronizer<MySyncPolicy> Sync;
-    // //message_filters::Synchronizer<MySyncPolicy> sync( MySyncPolicy(10), camera_cloud_sub, lidar_cloud_sub);
-    // boost::shared_ptr<Sync> S;
-    // S.reset(new Sync( MySyncPolicy(10), camera_cloud_sub, lidar_cloud_sub));
-    // S->registerCallback( boost::bind(&pointcloudCallback, _1, _2) );
-
-    // ros::Publisher laser_pub = nh.advertise<sensor_msgs::LaserScan>("/scan", 500);
-    // ros::Publisher filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/vertical_points_filter", 100000);
-
-    //ros::Subscriber sub = nh.subscribe("/scan", 1000, pointcloudCallback);
-    //ros::Subscriber point_sub_camera = nh.subscribe("/camera/depth/color/points", 1000, pointcloudCallback);
-
-//////////////////////////////////////////// 
