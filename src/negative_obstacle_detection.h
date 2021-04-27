@@ -47,11 +47,11 @@ namespace NegativeObstacle{
       // Filtering Limit Paramaters
       float floor_projection_min_height_ = 0.30;  // 0.24 - SIM   // 0.30 - REAL LIFE
       float floor_projection_max_height_ = 0.40; //  0.29 - SIM  // 0.40 - REAL LIFE
-      float neg_lim_filter_min_height_ = 0.30;  // 0.3 - SIM    // 0.9 - REAL LIFE
-      float neg_lim_filter_max_height_ = 5;    //  5 - SIM     // 5 - REAL LIFE
+      //float neg_lim_filter_min_height_ = 0.30;  // 0.3 - SIM    // 0.9 - REAL LIFE
+      //float neg_lim_filter_max_height_ = 5;    //  5 - SIM     // 5 - REAL LIFE
 
       // Camrea Filtering Down Paramater 
-      float leaf_size_ = 0.06;
+      //float leaf_size_ = 0.06f;
 
       
 
@@ -75,10 +75,10 @@ namespace NegativeObstacle{
       private:
 
       // Virtual Floor Projection Paramaters 
-      float virtual_floor_max_height_ = 5;
-      float virtual_floor_min_height_ = 0.9; //sim 0.3
-      // Set vertical height from laser
-      double y_prime_ = 0.25;  // Real life 0.25
+      //float virtual_floor_max_height_ = 5;
+      //float virtual_floor_min_height_ = 0.9; //sim 0.3
+      //Set vertical height from laser
+      //double y_prime_ = 0.25;  // Real life 0.25
 
     };
 
