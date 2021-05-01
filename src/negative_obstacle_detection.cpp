@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 //      Title     : negative_obstacle_detection.cpp
-//      Project   : fast_frontier_detection
+//      Project   : negative_obstacle_detection
 //      Created   : 01/15/21
 //      Author    : Adrian Abeyta
 //      Platforms : Ubuntu 64-bit
