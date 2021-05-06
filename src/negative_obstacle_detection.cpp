@@ -61,7 +61,7 @@
 #include <pcl/common/projection_matrix.h>
 #include <pcl/filters/crop_box.h>
 
-#include <algorithm>   
+   
 using geometry::line2f;
 using std::cout;
 using std::endl;
@@ -75,6 +75,7 @@ using namespace ros_helpers;
 
 namespace NegativeObstacle{
 
+// TODO: SET UP A WAY TO FILTER DOWN POINTCLOUDS    
 // //// Lidar Method /////
 // pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::PointsToFloor( const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered ){
 
@@ -104,9 +105,12 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::FloorProjection( const pcl::Point
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud (cloud);
     
+    const float floor_projection_min_height = 0.30;  // 0.24 - SIM   // 0.30 - REAL LIFE
+    const float floor_projection_max_height = 0.40; //  0.29 - SIM  // 0.40 - REAL LIFE
+
     // Camera's coordnate system is different from LIDAR, Y is vertical with positive pointing down. 
     pass.setFilterFieldName ("y");
-    pass.setFilterLimits (floor_projection_min_height_, floor_projection_max_height_); 
+    pass.setFilterLimits (floor_projection_min_height, floor_projection_max_height); 
     
     // //Fill in the new filter
     pass.filter (*cloud_filtered);
@@ -119,10 +123,13 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::NegativeLimitFilter( const pcl::P
     // Create the filtering object
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud (cloud);
-    
+   
+    const float neg_lim_filter_min_height = 0.30;  // 0.3 - SIM    // 0.9 - REAL LIFE
+    const float neg_lim_filter_max_height = 5.0;    //  5 - SIM     // 5 - REAL LIFE
+
     // Camera's coordnate system is different from LIDAR, Y is vertical with positive pointing down. 
     pass.setFilterFieldName ("y");
-    pass.setFilterLimits ( 0.03, 5 ); 
+    pass.setFilterLimits (neg_lim_filter_min_height, neg_lim_filter_max_height); //0.03, 5
    
     //Fill in the new filter
     pass.filter (*cloud_filtered);
@@ -149,7 +156,11 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr FilterPCL::Filter_Camera_Points( pcl::PointC
     //Create the filtering object for camera 
     pcl::VoxelGrid<pcl::PointXYZ> sor_cam;
     sor_cam.setInputCloud (cloud);
-    sor_cam.setLeafSize (0.06f , 0.06f, 0.06f);
+
+    //Camrea Filtering Down Paramater 
+    const float leaf_size = 0.06f;
+
+    sor_cam.setLeafSize (leaf_size , leaf_size, leaf_size);
     sor_cam.filter (*camera_cloud_filtered);
 
     return camera_cloud_filtered; 
@@ -169,11 +180,11 @@ sensor_msgs::LaserScan FarthestPoint::FurthestPointExtraction( sensor_msgs::Poin
       scan.header.frame_id = "camera_color_frame";
       scan.header.seq = cloud_filtered.header.seq;
     }
-    //cout<< scan.header.frame_id<<endl;
+   
     scan.header.stamp = scan_time;
     scan.angle_min = -M_PI/2;
     scan.angle_max = M_PI/2;
-    scan.angle_increment = M_PI/180.0/2.0; 
+    scan.angle_increment = M_PI/180.0; 
     scan.time_increment = 0; 
     scan.range_min = 0.0; 
     scan.range_max = 10;
@@ -204,9 +215,7 @@ sensor_msgs::LaserScan FarthestPoint::FurthestPointExtraction( sensor_msgs::Poin
         {
             scan.ranges[index] = range;
         }
-
     }
-
     return scan; 
 };
 
@@ -227,7 +236,6 @@ sensor_msgs::LaserScan FarthestPoint::VirtualFloorProjection( sensor_msgs::Point
     scan.angle_increment = M_PI/360; 
     scan.time_increment = 0; 
     scan.range_min = 0; 
-    //scan.range_max = std::numeric_limits<double>::max();
     scan.range_max = 200;
    
     //Determine amount of rays to create
@@ -244,10 +252,10 @@ sensor_msgs::LaserScan FarthestPoint::VirtualFloorProjection( sensor_msgs::Point
        {
            continue;
        }
-        float virtual_floor_max_height_ = 5;
-        float virtual_floor_min_height_ = 0.9;
+        const float virtual_floor_max_height = 5.0;
+        const float virtual_floor_min_height = 0.9;
         
-       if (*iter_y >virtual_floor_max_height_ || *iter_y < virtual_floor_min_height_) 
+       if (*iter_y >virtual_floor_max_height || *iter_y < virtual_floor_min_height) 
        {
            continue;
        } 
@@ -278,7 +286,6 @@ sensor_msgs::LaserScan FarthestPoint::VirtualFloorProjection( sensor_msgs::Point
         {
             scan.ranges[index] = range;
         }
-       
   }
 
     return scan;
@@ -289,15 +296,14 @@ sensor_msgs::LaserScan FarthestPoint::VirtualFloorProjection( sensor_msgs::Point
 
 sensor_msgs::LaserScan FarthestPoint::PointToLaser( const sensor_msgs::PointCloud2ConstPtr&  cloud_filtered ){
 
-    //sensor_msgs::LaserScan  scan;
     sensor_msgs::LaserScanPtr scan(new sensor_msgs::LaserScan());
     ros::Time scan_time = ros::Time::now();
     
-    //if (scan->header.frame_id.empty())
-    //{
+    if (scan->header.frame_id.empty())
+    {
       scan->header.frame_id ="velodyne";
       scan->header.seq = cloud_filtered->header.seq;
-    //}
+    }
 
     scan->header.stamp = scan_time;
     scan->angle_min = -M_PI;
@@ -307,16 +313,12 @@ sensor_msgs::LaserScan FarthestPoint::PointToLaser( const sensor_msgs::PointClou
     scan->range_min = 0.4; 
     scan->range_max = 200;
     
-    // //Determine amount of rays to create
-    // uint32_t ranges_size = (scan->angle_max - scan->angle_min) / scan->angle_increment;
-    // //scan.ranges.assign(ranges_size, scan.range_max + 1);
-    // scan->ranges.assign(ranges_size, std::numeric_limits<double>::infinity());
-
-    uint32_t ranges_size = std::ceil((scan->angle_max - scan->angle_min) / scan->angle_increment);
-    scan->ranges.assign(ranges_size, scan->range_max + 1);
-    
-    float max_height_ = 0.35;
-    float min_height_ = -0.25;
+    //Determine amount of rays to create
+     uint32_t ranges_size = std::ceil((scan->angle_max - scan->angle_min) / scan->angle_increment);
+     scan->ranges.assign(ranges_size, scan->range_max + 1);
+   
+    const float max_height = 0.35;
+    const float min_height = -0.25;
 
     for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(*cloud_filtered, "x"),
     iter_y(*cloud_filtered, "y"), iter_z(*cloud_filtered, "z");
@@ -326,12 +328,12 @@ sensor_msgs::LaserScan FarthestPoint::PointToLaser( const sensor_msgs::PointClou
        {
            continue;
        }
-       if (*iter_z > max_height_ || *iter_z < min_height_) 
+       if (*iter_z > max_height || *iter_z < min_height) 
        {
            continue;
        } 
 
-       float range = sqrt( *iter_x * *iter_x + *iter_y * *iter_y);
+        float range = sqrt( *iter_x * *iter_x + *iter_y * *iter_y);
 
         if (range < scan->range_min) 
         {
@@ -352,7 +354,7 @@ sensor_msgs::LaserScan FarthestPoint::PointToLaser( const sensor_msgs::PointClou
             scan->ranges[index] = range;
         }
   }
-    return std::move(*scan); 
+    return *scan; 
 };
 
 sensor_msgs::LaserScan FarthestPoint::CombineLaserScans( sensor_msgs::LaserScan  array_a, sensor_msgs::LaserScan  array_b , sensor_msgs::LaserScan  array_c){
@@ -372,4 +374,3 @@ sensor_msgs::LaserScan FarthestPoint::CombineLaserScans( sensor_msgs::LaserScan 
 };
 
 }; //End of Negative obstacle namespace.
-
