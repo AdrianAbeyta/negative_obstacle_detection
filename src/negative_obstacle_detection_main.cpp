@@ -31,7 +31,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-
 #include "negative_obstacle_detection.h"
 #include <ros/ros.h> 
 #include <sensor_msgs/LaserScan.h>
@@ -99,17 +98,15 @@ void pointcloudCallback(const sensor_msgs::PointCloud2ConstPtr& camera_cloud, co
     
     //////////// OBSTACLE DETECTION ////////////
 
-    /////Points_To_Floor_filter = point_cloud_->PointsToFloor(lidar_cloud, Points_To_Floor_filter ); // TO DO -SET UP A WAY TO FILTER DOWN POINTCLOUDS
+    /////Points_To_Floor_filter = point_cloud_->PointsToFloor(lidar_cloud, Points_To_Floor_filter ); // TODO: SET UP A WAY TO FILTER DOWN POINTCLOUDS
     
     // Get resdulting laserscan from filtered point clouds. 
     C_ = furthest_point_->PointToLaser(lidar_cloud);
-    C_.header.frame_id = "velodyne";
+    
 
     // Combine the respective methods Laserscan into a single scan. 
     D_ = furthest_point_->CombineLaserScans( B_ , C_ , D_);
-    D_.header.frame_id = "velodyne";
-
-    //ROS_INFO("ODOM: [%f]", (*lidar_cloud).header.stamp);
+    
 }
 
 int main(int argc, char** argv) {
@@ -123,15 +120,16 @@ int main(int argc, char** argv) {
    
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,sensor_msgs::PointCloud2> MySyncPolicy;
     typedef message_filters::Synchronizer<MySyncPolicy> Sync;
-    //message_filters::Synchronizer<MySyncPolicy> sync( MySyncPolicy(10), camera_cloud_sub, lidar_cloud_sub);
+    
     boost::shared_ptr<Sync> S;
     S.reset(new Sync( MySyncPolicy(5), camera_cloud_sub, lidar_cloud_sub));
     S->registerCallback( boost::bind(&pointcloudCallback, _1, _2) );
 
     //ros::Publisher camera_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/camera_scan", 1);
-    ros::Publisher velodyne_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/scan_multi", 1);
     //ros::Publisher camera_filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/camera_points_filter", 1000);
-    ros::Publisher velodyne_filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/velodyne_points_filter", 1000);
+    
+    ros::Publisher velodyne_laser_pub = nh.advertise<sensor_msgs::LaserScan>("/scan_multi", 1);
+    //ros::Publisher velodyne_filter_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/velodyne_points_filter", 1000);
 
     ros::Rate loop_rate(10); //10 Hz
     
@@ -139,10 +137,11 @@ int main(int argc, char** argv) {
     int count = 0;
     while (ros::ok())
     {   
-        velodyne_filter_pub.publish(*Points_To_Floor_filter);
+        // Vizualize filtered pointcloud points 
+        //velodyne_filter_pub.publish(*Points_To_Floor_filter);
         //camera_filter_pub.publish(*negative_cloud_filter);
         
-        //camera_laser_pub.publish(C_);
+        // Pub combined laserscan
         velodyne_laser_pub.publish(D_);
 
         ros::spinOnce();
