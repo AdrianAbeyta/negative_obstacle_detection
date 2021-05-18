@@ -15,7 +15,7 @@ roslaunch magni_viz view_demo.launch
 2. Run the negative_obstacle_detection node. 
 
 ```
-rosrun negative_obstacle_detection negative_obstacle_deteion_node
+roslaunch negative_obstacle_detection negative_obstacle_detection.launch
 ```
 3. Run the slam_gmapping node. 
 
