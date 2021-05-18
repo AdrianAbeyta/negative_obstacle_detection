@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+
+<launch>
+  <!-- Loading the live mapper params from the yaml file -->
+  <rosparam command="load" file="$(find negative_obstacle_detection)/param/negative_obstacle_detection.yaml"/>
+
+  <!-- Run the NOD node -->
+  <node
+    name  = "negative_obstacle_detection"
+    pkg   = "negative_obstacle_detection"
+    type  = "negative_obstacle_detection_node"
+    args  = ""
+    output= "screen"
+  >
+  </node>
+ 
+</launch>

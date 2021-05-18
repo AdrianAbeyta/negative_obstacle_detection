@@ -1,0 +1,14 @@
+negative_obstacle_detection:
+  leaf_size: 0.06 # Fliter amount 
+  floor_projection_min_height: 0.30 # Min height of pointcloud point to take into consideration 
+  floor_projection_max_height: 0.40 # Max height of pointcloud point to take into consideration
+  neg_lim_filter_min_height: 0.20  
+  neg_lim_filter_max_height: 5.0 
+  laser_max_height: 0.35 
+  laser_min_height: -0.25
+  virtual_floor_max_height: 5.0
+  virtual_floor_min_height: 0.9
+  y_prime: 0.25 # Height of the laser scan sensor 
+  point_to_laser_max_height: 0.35
+  point_to_laser_min_height: -0.25
+
