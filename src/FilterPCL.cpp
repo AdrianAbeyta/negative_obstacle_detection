@@ -80,9 +80,6 @@ void Filter_Camera_Points( float leaf_size, const pcl::PointCloud<pcl::PointXYZ>
     pcl::VoxelGrid<pcl::PointXYZ> sor_cam;
     sor_cam.setInputCloud (cloud);
 
-    //Camrea Filtering Down Paramater 
-   // const float leaf_size = 0.06f;
-
     sor_cam.setLeafSize (leaf_size , leaf_size, leaf_size);
     sor_cam.filter (*camera_cloud_filtered);
 
@@ -107,9 +104,6 @@ void FloorProjection( float floor_projection_min_height_,float floor_projection_
     // Create the filtering object
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud (cloud);
-    
-    //float floor_projection_min_height = 0.30;  // 0.24 - SIM   // 0.30 - REAL LIFE
-    //float floor_projection_max_height = 0.40; //  0.29 - SIM  // 0.40 - REAL LIFE
 
     // Camera's coordnate system is different from LIDAR, Y is vertical with positive pointing down. 
     pass.setFilterFieldName ("y");
@@ -125,13 +119,10 @@ void NegativeLimitFilter(float neg_lim_filter_min_height_, float neg_lim_filter_
     // Create the filtering object
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud (cloud);
-   
-    //const float neg_lim_filter_min_height = 0.20;  // 0.3 - SIM    // 0.9 - REAL LIFE
-    //const float neg_lim_filter_max_height = 5.0;    //  5 - SIM     // 5 - REAL LIFE
-
+  
     // Camera's coordnate system is different from LIDAR, Y is vertical with positive pointing down. 
     pass.setFilterFieldName ("y");
-    pass.setFilterLimits (neg_lim_filter_min_height_, neg_lim_filter_max_height_); //0.03, 5
+    pass.setFilterLimits (neg_lim_filter_min_height_, neg_lim_filter_max_height_);
    
     //Fill in the new filter
     pass.filter (*cloud_filtered);
